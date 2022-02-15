@@ -1,0 +1,149 @@
+#include <Arduino.h>
+#include <Wire.h>
+#include <ADC.h>
+#include <ADC_util.h>
+
+int numMotors = 8;
+int motorPWMPins[] = {23, 4, 6, 24, 25, 28, 29, 33};
+int motorDIRPins[] = {22, 5, 7, 26, 27, 30, 31, 32};
+
+int frleftMotorIdx = 0;
+int frrightMotorIdx = 1;
+int bkleftMotorIdx = 7;
+int bkrightMotorIdx = 2;
+
+boolean frleftMotorRev = true;
+boolean frrightMotorRev = false;
+boolean bkleftMotorRev = true;
+boolean bkrightMotorRev = false;
+
+int frleftMotorSpd = 0;
+int frrightMotorSpd = 0;
+int bkleftMotorSpd = 0;
+int bkrightMotorSpd = 0;
+
+int motorSpeed = 0;
+int motorDir = 1;
+
+//*******************************
+// Battery Voltage Reader Config
+//*******************************
+#define BAT_SENS_PIN PIN_A2
+ADC *adc = new ADC();              // adc object
+float cells = 4;                   // Number of battery cells present
+float minBatVoltage = 3.4 * cells; // Below this voltage motors should refuse to function
+float maxBatVoltage = 4.2 * cells; // Battery voltage that should be considered fully charged
+
+float batteryVoltage;
+float batteryCharge;
+
+u_int32_t lastBatteryTime = 0;
+void publishBatteryData();
+
+void setup() {
+  // put your setup code here, to run once:  
+  Serial.begin(9600);
+  // Set motor pins to output
+  for (int i = 0; i < numMotors; i++)
+  {
+    pinMode(motorPWMPins[i], OUTPUT);
+    pinMode(motorDIRPins[i], OUTPUT);
+  }
+
+      // Setup Battery Voltage Measurement
+    // Set battery voltage sense pin to input
+    pinMode(BAT_SENS_PIN, INPUT);
+
+    // Configure ADC0
+    adc->adc0->setAveraging(16);                                         // set number of averages
+    adc->adc0->setResolution(16);                                        // set bits of resolution
+    adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_LOW_SPEED); // change the conversion speed
+    adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::MED_SPEED);          // change the sampling speed
+
+    //Read battery voltage
+    int value1 = adc->adc0->analogRead(BAT_SENS_PIN); // get raw ADC reading
+    float batVoltage = value1 * 3.3 / (1.0 / (1.0 + 10.0)) / adc->adc0->getMaxValue(); // convert reading to voltage
+    float batCharge = (batVoltage - minBatVoltage) / (maxBatVoltage - minBatVoltage); // convert voltage to naive charge percent (could be improved by factoring in discharge curves)
+}
+
+int lastPacketTime = 0;
+bool alternate;
+
+void calculateMotorSpeeds(float magnitude, float direction, float speed)
+{
+    float scale = 255 * speed;
+    frleftMotorSpd = (int)constrain(scale*(-magnitude - direction), -255, 255);
+    frrightMotorSpd = (int)constrain(scale*(-magnitude + direction), -255, 255);
+    bkleftMotorSpd = (int)constrain(scale*(-magnitude - direction), -255, 255);
+    bkrightMotorSpd = (int)constrain(scale*(-magnitude + direction), -255, 255);
+}
+
+void parseCommand(String command)
+{
+    String exec = command.substring(0, command.indexOf(';'));
+    if (exec.equals("set_motors"))
+    {
+        int firstCommma = command.indexOf(',');
+        int lastComma = command.lastIndexOf(',');
+        String mag = command.substring(exec.length()+1, firstCommma);
+        String dir = command.substring(firstCommma+1, lastComma);
+        String speed_str = command.substring(lastComma+1);
+        
+        float magnitude = strtof(mag.c_str(), NULL) * -1; // -1 is forward, +1 is backwards
+        float direction = strtof(dir.c_str(), NULL);
+        float speed = strtof(speed_str.c_str(), NULL);
+
+        calculateMotorSpeeds(magnitude, direction, speed);
+
+        Serial.print("status;");
+        Serial.print(batteryVoltage);
+        Serial.print(" ");
+        Serial.print(frleftMotorSpd);
+        Serial.print(" ");
+        Serial.print(frrightMotorSpd);
+        Serial.print(" ");
+        Serial.print(bkleftMotorSpd);
+        Serial.print(" ");
+        Serial.print(bkrightMotorSpd);
+        Serial.println(" ");
+    }
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  //Read battery voltage and charge
+  int value1 = adc->adc0->analogRead(BAT_SENS_PIN);
+  batteryVoltage = value1 * 3.3 / (1.0 / (1.0 + 10.0)) / adc->adc0->getMaxValue();
+  batteryCharge = (batteryVoltage - minBatVoltage) / (maxBatVoltage - minBatVoltage);
+
+  //Serial.println(batteryVoltage);
+
+  if (Serial.available())
+  {
+      String command = Serial.readStringUntil('\n');
+      Serial.println(command);
+      parseCommand(command);
+      lastPacketTime = millis();
+  }
+
+ if (millis() - lastPacketTime > 250)
+  {
+    frleftMotorSpd = 0;
+    frrightMotorSpd = 0;
+    bkleftMotorSpd = 0;
+    bkrightMotorSpd = 0;
+  }
+
+  // Set motor speeds
+  analogWrite(motorPWMPins[frleftMotorIdx], abs(frleftMotorSpd));
+  digitalWrite(motorDIRPins[frleftMotorIdx], frleftMotorRev ? frleftMotorSpd > 0 : frleftMotorSpd < 0);
+
+  analogWrite(motorPWMPins[frrightMotorIdx], abs(frrightMotorSpd));
+  digitalWrite(motorDIRPins[frrightMotorIdx], frrightMotorRev ? frrightMotorSpd > 0 : frrightMotorSpd < 0);
+
+  analogWrite(motorPWMPins[bkleftMotorIdx], abs(bkleftMotorSpd));
+  digitalWrite(motorDIRPins[bkleftMotorIdx], bkleftMotorRev ? bkleftMotorSpd > 0 : bkleftMotorSpd < 0);
+
+  analogWrite(motorPWMPins[bkrightMotorIdx], abs(bkrightMotorSpd));
+  digitalWrite(motorDIRPins[bkrightMotorIdx], bkrightMotorRev ? bkrightMotorSpd > 0 : bkrightMotorSpd < 0);
+}
