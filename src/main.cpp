@@ -14,16 +14,16 @@
 //*******************************
 // RGB Strip Configuration
 //*******************************
-#define LED_PIN 17
-#define LED_COUNT 24
+#define LED_PIN 2
+#define LED_COUNT 64
 #define SERIAL_TX_LED 0
 #define SERIAL_RX_LED 1
 #define LORA_TX_LED 2
 #define LORA_RX_LED 3
 #define BORDER_START_LED 4
-#define BORDER_END_LED 23
+#define BORDER_END_LED 63
 
-Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_RGBW + NEO_KHZ800); 
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800); 
 // RGB Strip Helped Functions
 void clear_strip(uint32_t color);
 void set_single_color(int pin, uint32_t color);
@@ -100,6 +100,16 @@ void setup()
     // LED Ring
     strip.begin();
     strip.setBrightness(255);
+    
+    // for (int i = 0; i < 6000; i++)
+    // {
+    //     delay(10);
+    //     //While waiting for the serial port to open, make a rainbow smiley face that changes color progressively faster and faster
+    //     uint32_t rgbcolor = strip.gamma32(strip.ColorHSV((i*500)%65536, 255, 255));
+    //     clear_strip(rgbcolor);
+    //     strip.show();
+    // }
+
     clear_strip(clear_color);
     
     // Serial Communications
@@ -109,20 +119,6 @@ void setup()
     {
         delay(10);
     }
-
-    // for (int i = 0; i < 30 && !Serial; i++)
-    // {
-    //     delay(10);
-    //     //While waiting for the serial port to open, make a rainbow smiley face that changes color progressively faster and faster
-    //     uint32_t rgbcolor = strip.gamma32(strip.ColorHSV((i*300*i/5000)%65536, 255, 255));
-    //     strip.setPixelColor(0, rgbcolor);
-    //     strip.setPixelColor(5, rgbcolor);
-    //     for (int j = 5+6; j < LED_COUNT-5; j++)
-    //     {
-    //     strip.setPixelColor(j, rgbcolor);
-    //     }
-    //     strip.show();
-    // }
     
     // LoRA
     // I2C - For GPS Module
