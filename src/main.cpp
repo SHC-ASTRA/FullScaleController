@@ -69,11 +69,10 @@ void calculateMotorSpeeds(float magnitude, float direction, float speed);
 //*******************************
 // Battery Voltage Reader Config
 //*******************************
-#define BAT_SENS_PIN PIN_A2
-ADC *adc = new ADC();              // adc object
-float cells = 4;                   // Number of battery cells present
+float cells = 8;                   // Number of battery cells present
 float minBatVoltage = 3.4 * cells; // Below this voltage motors should refuse to function
 float maxBatVoltage = 4.2 * cells; // Battery voltage that should be considered fully charged
+float fullAmpHours = 20;
 
 float batteryVoltage;
 float batteryCharge;
@@ -206,30 +205,21 @@ void setup()
         s(); Serial.println("No VESC5");
     }
 
-    // Setup Battery Voltage Measurement
-    // Set battery voltage sense pin to input
-    pinMode(BAT_SENS_PIN, INPUT);
+    // Give VESC time to boot up
+    delay(1000);
 
-    // Configure ADC0
-    adc->adc0->setAveraging(16);                                         // set number of averages
-    adc->adc0->setResolution(16);                                        // set bits of resolution
-    adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_LOW_SPEED); // change the conversion speed
-    adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::MED_SPEED);          // change the sampling speed
+    // Tell VESC to send us its data
+    VESC1.getVescValues();
 
     //Read battery voltage
-    int value1 = adc->adc0->analogRead(BAT_SENS_PIN); // get raw ADC reading
-    float batVoltage = value1 * 3.3 / (1.0 / (1.0 + 10.0)) / adc->adc0->getMaxValue(); // convert reading to voltage
-    float batCharge = (batVoltage - minBatVoltage) / (maxBatVoltage - minBatVoltage); // convert voltage to naive charge percent (could be improved by factoring in discharge curves)
+    batteryVoltage = VESC1.data.inpVoltage; // Read voltage directly from VESC
+    batteryCharge = VESC1.data.ampHours/fullAmpHours; // Read amp hours from VESC
 
     clear_strip(clear_color);
 }
 
 void loop()
 {
-    //Read battery voltage and charge
-    int value1 = adc->adc0->analogRead(BAT_SENS_PIN);
-    batteryVoltage = value1 * 3.3 / (1.0 / (1.0 + 10.0)) / adc->adc0->getMaxValue();
-    batteryCharge = (batteryVoltage - minBatVoltage) / (maxBatVoltage - minBatVoltage);
 
     // Process GPS
     if (millis() - lastGPSTime > 250 && GNSS_enable)
@@ -241,8 +231,16 @@ void loop()
 
     if (millis() - lastBatteryTime > 1000)
     {
+        // Tell VESC to send us its data
+        VESC1.getVescValues();
+
+        //Read battery voltage
+        batteryVoltage = VESC1.data.inpVoltage; // Read voltage directly from VESC
+        batteryCharge = VESC1.data.ampHours/fullAmpHours; // Read amp hours from VESC
+        
         lastBatteryTime = millis();
-        //publishBatteryData();
+
+        publishBatteryData();
     }
 
     if (Serial.available())
