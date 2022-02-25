@@ -208,12 +208,12 @@ void setup()
     // Give VESC time to boot up
     delay(1000);
 
-    // Tell VESC to send us its data
+     // Tell VESC to send us its data
     VESC1.getVescValues();
 
     //Read battery voltage
     batteryVoltage = VESC1.data.inpVoltage; // Read voltage directly from VESC
-    batteryCharge = VESC1.data.ampHours/fullAmpHours; // Read amp hours from VESC
+    batteryCharge = (batteryVoltage - minBatVoltage) / (maxBatVoltage - minBatVoltage);
 
     clear_strip(clear_color);
 }
@@ -236,10 +236,9 @@ void loop()
 
         //Read battery voltage
         batteryVoltage = VESC1.data.inpVoltage; // Read voltage directly from VESC
-        batteryCharge = VESC1.data.ampHours/fullAmpHours; // Read amp hours from VESC
-        
-        lastBatteryTime = millis();
+        batteryCharge = (batteryVoltage - minBatVoltage) / (maxBatVoltage - minBatVoltage);
 
+        lastBatteryTime = millis();
         publishBatteryData();
     }
 
