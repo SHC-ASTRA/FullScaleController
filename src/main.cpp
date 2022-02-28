@@ -377,7 +377,7 @@ void publishGPSData()
     Serial.print(",motion_heading=");
     Serial.print(motion_heading);
 
-    long horizontal_accuracy = 3;
+    long horizontal_accuracy = 3000;
     Serial.print(",horizontal_accuracy=");
     Serial.println(horizontal_accuracy);
 }
