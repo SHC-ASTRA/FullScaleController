@@ -9,6 +9,7 @@
 #include <ADC.h>
 #include <ADC_util.h>
 #include <VescUart.h>
+#include <Adafruit_GPS.h>
 
 
 //*******************************
@@ -36,17 +37,10 @@ const uint32_t border_color = strip.Color(255, 0, 127);
 //*******************************
 // GPS Module Configuration
 //*******************************
-SFE_UBLOX_GNSS myGNSS;
-
-boolean GNSS_enable = true;
-
-long latitude_mdeg = 0;
-long longitude_mdeg = 0;
-int numSats = 0;
-
-u_int32_t lastGPSTime = 0;
-
-void publishPVTdata(UBX_NAV_PVT_data_t);
+#define GPSSerial Serial6
+Adafruit_GPS GPS(&GPSSerial);
+void setupAdafruitGPS();
+void publishGPSData();
 
 //*******************************
 // Motor Drivers Configuration
@@ -99,15 +93,6 @@ void setup()
     // LED Ring
     strip.begin();
     strip.setBrightness(255);
-    
-    // for (int i = 0; i < 6000; i++)
-    // {
-    //     delay(10);
-    //     //While waiting for the serial port to open, make a rainbow smiley face that changes color progressively faster and faster
-    //     uint32_t rgbcolor = strip.gamma32(strip.ColorHSV((i*500)%65536, 255, 255));
-    //     clear_strip(rgbcolor);
-    //     strip.show();
-    // }
 
     clear_strip(clear_color);
     
@@ -125,20 +110,7 @@ void setup()
     Wire.setClock(400000);
 
     // GPS Module
-    if (!myGNSS.begin())
-    {
-        Serial.println("status;Ublox GPS not detected at default I2C address. Please check wiring.");
-        GNSS_enable = false;
-    } 
-    else 
-    {
-        myGNSS.setI2COutput(COM_TYPE_UBX);                 //Set the I2C port to output UBX only (turn off NMEA noise)
-        myGNSS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT); //Save (only) the communications port settings to flash and BBR
-
-        myGNSS.setNavigationFrequency(2); //Produce two solutions per second
-
-        myGNSS.setAutoPVTcallback(&publishPVTdata);
-    }
+    setupAdafruitGPS();
 
     // Setup VESC Motors
     Serial8.begin(115200);
@@ -219,14 +191,13 @@ void setup()
 }
 
 void loop()
-{
-
+{ 
+    GPS.read();
     // Process GPS
-    if (millis() - lastGPSTime > 250 && GNSS_enable)
+    if (GPS.newNMEAreceived())
     {
-        lastGPSTime = millis();
-        myGNSS.checkUblox();     // Check for the arrival of new data and process it.
-        myGNSS.checkCallbacks(); // Check if any callbacks are waiting to be processed.
+        GPS.parse(GPS.lastNMEA());
+        publishGPSData();
     }
 
     if (millis() - lastBatteryTime > 1000)
@@ -332,55 +303,6 @@ void set_single_color(int pin, uint32_t color)
     strip.show();
 }
 
-void publishPVTdata(UBX_NAV_PVT_data_t ubxDataStruct)
-{
-    set_single_color(SERIAL_TX_LED, serial_tx_color);
-
-    Serial.print("gps;");
-
-    Serial.print("time=");
-    uint8_t hms = ubxDataStruct.hour; // Print the hours
-    Serial.print(hms);
-
-    Serial.print(F(":"));
-    hms = ubxDataStruct.min; // Print the minutes
-    Serial.print(hms);
-
-    Serial.print(F(":"));
-    hms = ubxDataStruct.sec; // Print the seconds
-    Serial.print(hms);
-
-    Serial.print(F("."));
-    unsigned long millisecs = ubxDataStruct.iTOW % 1000; // Print the milliseconds
-    Serial.print(millisecs);
-
-    Serial.print(",lat=");    
-    long latitude = ubxDataStruct.lat; // Print the latitude
-    Serial.print(latitude);
-
-    Serial.print(",long=");
-    long longitude = ubxDataStruct.lon; // Print the longitude
-    Serial.print(longitude);
-
-    long altitude = ubxDataStruct.hMSL; // Print the height above mean sea level
-    Serial.print(",alt=");
-    Serial.print(altitude);
-
-    long ground_speed = ubxDataStruct.gSpeed;
-    Serial.print(",ground_speed=");
-    Serial.print(ground_speed);
-
-    long motion_heading = ubxDataStruct.headMot;
-    Serial.print(",motion_heading=");
-    Serial.print(motion_heading);
-
-    long horizontal_accuracy = ubxDataStruct.hAcc;
-    Serial.print(",horizontal_accuracy=");
-    Serial.println(horizontal_accuracy);
-
-    set_single_color(SERIAL_TX_LED, clear_color);
-}
-
 void publishBatteryData()
 {
     set_single_color(SERIAL_TX_LED, serial_tx_color);
@@ -394,4 +316,68 @@ void publishBatteryData()
     Serial.println(batteryCharge);
 
     set_single_color(SERIAL_TX_LED, clear_color);
+}
+
+void setupAdafruitGPS()
+{
+    // 9600 NMEA is the default baud rate for Adafruit MTK GPS's- some use 4800
+    GPS.begin(9600);
+    // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
+    GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+    // uncomment this line to turn on only the "minimum recommended" data
+    //GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCONLY);
+    // For parsing data, we don't suggest using anything but either RMC only or RMC+GGA since
+    // the parser doesn't care about other sentences at this time
+    // Set the update rate
+    GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ); // 1 Hz update rate
+    // For the parsing code to work nicely and have time to sort thru the data, and
+    // print it out we don't suggest using anything higher than 1 Hz
+
+    // Request updates on antenna status, comment out to keep quiet
+    GPS.sendCommand(PGCMD_ANTENNA);
+}
+
+void publishGPSData()
+{
+    Serial.print("gps;");
+
+    Serial.print("time=");
+    uint8_t hms = GPS.hour; // Print the hours
+    Serial.print(hms);
+
+    Serial.print(F(":"));
+    hms = GPS.minute; // Print the minutes
+    Serial.print(hms);
+
+    Serial.print(F(":"));
+    hms = GPS.seconds; // Print the seconds
+    Serial.print(hms);
+
+    Serial.print(F("."));
+    unsigned long millisecs = GPS.milliseconds; // Print the milliseconds
+    Serial.print(millisecs);
+
+    Serial.print(",lat=");    
+    long latitude = GPS.latitudeDegrees; // Print the latitude
+    Serial.print(latitude);
+
+    Serial.print(",long=");
+    long longitude = GPS.longitudeDegrees; // Print the longitude
+    Serial.print(longitude);
+
+    long altitude = GPS.altitude; // Print the height above mean sea level
+    Serial.print(",alt=");
+    Serial.print(altitude);
+
+    long ground_speed = GPS.speed;
+    Serial.print(",ground_speed=");
+    Serial.print(ground_speed);
+
+    long motion_heading = GPS.angle;
+    Serial.print(",motion_heading=");
+    Serial.print(motion_heading);
+
+    long horizontal_accuracy = 3;
+    Serial.print(",horizontal_accuracy=");
+    Serial.println(horizontal_accuracy);
 }
