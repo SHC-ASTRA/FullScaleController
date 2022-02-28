@@ -58,6 +58,7 @@ VescUart VESC4; // Back Left
 VescUart VESC5; // AUX1 (Used for Back Right)
 // VESC 6 (Aux2) is not needed
 
+void calculateTankControlSpeeds(float magnitude, float direction, float speed);
 void calculateMotorSpeeds(float magnitude, float direction, float speed);
 
 //*******************************
@@ -251,8 +252,31 @@ void parseCommand(String command)
         float direction = strtof(dir.c_str(), NULL);
         float speed = strtof(speed_str.c_str(), NULL);
 
-        calculateMotorSpeeds(magnitude, direction, speed);
+        calculateTankControlSpeeds(magnitude, direction, speed);
 
+    }
+}
+
+void calculateTankControlSpeeds(float left, float right, float speed)
+{
+    int MAX_SPEED = 6000;
+    float scale = MAX_SPEED * speed;
+    frleftMotorSpd = (int)constrain(scale*(left), -MAX_SPEED, MAX_SPEED);
+    frrightMotorSpd = (int)constrain(scale*(right), -MAX_SPEED, MAX_SPEED);
+    bkleftMotorSpd = (int)constrain(scale*(left), -MAX_SPEED, MAX_SPEED);
+    bkrightMotorSpd = (int)constrain(scale*(right), -MAX_SPEED, MAX_SPEED);
+
+    if (abs(frleftMotorSpd) < 1000) {
+      frleftMotorSpd = 0;
+    }
+    if (abs(frrightMotorSpd) < 1000) {
+      frrightMotorSpd = 0;
+    }
+    if (abs(bkleftMotorSpd) < 1000) {
+      bkleftMotorSpd = 0;
+    }
+    if (abs(bkrightMotorSpd) < 1000) {
+      bkrightMotorSpd = 0;
     }
 }
 
