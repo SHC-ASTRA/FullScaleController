@@ -272,6 +272,9 @@ void parseCommand(String command)
             clear_strip(goal_color);
         else
             clear_strip(clear_color);
+    } else if (exec.equals("signal_idle"))
+    {
+        clear_strip(clear_color);
     }
 }
 
@@ -347,8 +350,6 @@ void set_single_color(int pin, uint32_t color)
 
 void publishBatteryData()
 {
-    set_single_color(SERIAL_TX_LED, serial_tx_color);
-
     Serial.print("battery;");
 
     Serial.print("v=");
@@ -356,8 +357,6 @@ void publishBatteryData()
 
     Serial.print(",c=");
     Serial.println(batteryCharge);
-
-    set_single_color(SERIAL_TX_LED, clear_color);
 }
 
 void setupAdafruitGPS()
