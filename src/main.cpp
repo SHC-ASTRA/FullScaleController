@@ -33,6 +33,10 @@ const uint32_t serial_tx_color = strip.Color(255, 0, 0, 0);
 const uint32_t serial_rx_color = strip.Color(255, 128, 0);
 const uint32_t clear_color = strip.Color(0, 0, 0);
 const uint32_t border_color = strip.Color(255, 0, 127);
+const uint32_t teleop_color = strip.Color(0, 0, 255);
+const uint32_t autonomous_color = strip.Color(255, 0, 0);
+const uint32_t goal_color = strip.Color(0, 255, 0);
+bool isGoal = false;
 
 //*******************************
 // GPS Module Configuration
@@ -254,6 +258,20 @@ void parseCommand(String command)
 
         calculateTankControlSpeeds(magnitude, direction, speed);
 
+    } else if (exec.equals("signal_teleop"))
+    {
+        clear_strip(teleop_color);
+    } else if (exec.equals("signal_autonomous"))
+    {
+        clear_strip(autonomous_color);
+    } else if (exec.equals("signal_goal"))
+    {
+        isGoal = !isGoal;
+
+        if (isGoal)
+            clear_strip(goal_color);
+        else
+            clear_strip(clear_color);
     }
 }
 
@@ -401,7 +419,7 @@ void publishGPSData()
     Serial.print(",motion_heading=");
     Serial.print(motion_heading);
 
-    long horizontal_accuracy = 3000;
+    long horizontal_accuracy = 3;
     Serial.print(",horizontal_accuracy=");
     Serial.println(horizontal_accuracy);
 }
