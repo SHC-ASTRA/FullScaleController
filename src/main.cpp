@@ -52,7 +52,13 @@ void publishGPSData();
 int frleftMotorSpd = 0;
 int frrightMotorSpd = 0;
 int bkleftMotorSpd = 0;
-int bkrightMotorSpd = 0;    
+int bkrightMotorSpd = 0;
+float maxPower = 0.5;
+float frRightPower = 0;
+float frLeftPower = 0;
+float bkRightPower = 0;
+float bkLeftPower = 0;
+int MAX_SPEED = 6000;
 u_int32_t lastPacketTime = 0;
 
 VescUart VESC1; // Front Right
@@ -257,7 +263,49 @@ void parseCommand(String command)
         float speed = strtof(speed_str.c_str(), NULL);
 
         calculateTankControlSpeeds(magnitude, direction, speed);
+    } else if (exec.equals("set_motor")) 
+    {
+        lastPacketTime = millis();
 
+        int firstComma = command.indexOf(',');
+        String motor = command.substring(exec.length()+1, firstComma);
+        String power_str = command.substring(firstComma+1);
+        float power = strtof(power_str.c_str(), NULL);
+
+        if (motor.equals("max_power"))
+        {
+            maxPower = power;
+        } else if (motor.equals("front_right"))
+        {
+            frRightPower = power;
+        } else if (motor.equals("front_left"))
+        {
+            frLeftPower = power;
+        } else if (motor.equals("back_right")) 
+        {
+            bkRightPower = power;
+        } else if (motor.equals("back_left"))
+        {
+            bkLeftPower = power;
+        }
+        
+        frrightMotorSpd = (int)constrain(frRightPower*MAX_SPEED*maxPower, -MAX_SPEED, MAX_SPEED);
+        frleftMotorSpd = (int)constrain(frLeftPower*MAX_SPEED*maxPower, -MAX_SPEED, MAX_SPEED);
+        bkrightMotorSpd = (int)constrain(bkRightPower*MAX_SPEED*maxPower, -MAX_SPEED, MAX_SPEED);
+        bkleftMotorSpd = (int)constrain(bkLeftPower*MAX_SPEED*maxPower, -MAX_SPEED, MAX_SPEED);
+
+        if (abs(frleftMotorSpd) < 1000) {
+            frleftMotorSpd = 0;
+        }
+        if (abs(frrightMotorSpd) < 1000) {
+            frrightMotorSpd = 0;
+        }
+        if (abs(bkleftMotorSpd) < 1000) {
+            bkleftMotorSpd = 0;
+        }
+        if (abs(bkrightMotorSpd) < 1000) {
+            bkrightMotorSpd = 0;
+        }
     } else if (exec.equals("signal_teleop"))
     {
         clear_strip(teleop_color);
@@ -280,7 +328,6 @@ void parseCommand(String command)
 
 void calculateTankControlSpeeds(float left, float right, float speed)
 {
-    int MAX_SPEED = 6000;
     float scale = MAX_SPEED * speed;
     frleftMotorSpd = (int)constrain(scale*(left), -MAX_SPEED, MAX_SPEED);
     frrightMotorSpd = (int)constrain(scale*(right), -MAX_SPEED, MAX_SPEED);
@@ -303,7 +350,6 @@ void calculateTankControlSpeeds(float left, float right, float speed)
 
 void calculateMotorSpeeds(float magnitude, float direction, float speed)
 {
-    int MAX_SPEED = 6000;
     float scale = MAX_SPEED * speed;
     frleftMotorSpd = (int)constrain(scale*(-magnitude - direction), -MAX_SPEED, MAX_SPEED);
     frrightMotorSpd = (int)constrain(scale*(-magnitude + direction), -MAX_SPEED, MAX_SPEED);
@@ -399,11 +445,11 @@ void publishGPSData()
     Serial.print(millisecs);
 
     Serial.print(",lat=");    
-    long latitude = GPS.latitudeDegrees; // Print the latitude
+    long latitude = GPS.latitude_fixed; // Print the latitude
     Serial.print(latitude);
 
     Serial.print(",long=");
-    long longitude = GPS.longitudeDegrees; // Print the longitude
+    long longitude = GPS.longitude_fixed; // Print the longitude
     Serial.print(longitude);
 
     long altitude = GPS.altitude; // Print the height above mean sea level
