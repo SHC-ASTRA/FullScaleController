@@ -98,12 +98,17 @@ void setMotors(float magnitude, float direction);
 #define RFM95_INT 4
 
 #define RF95_FREQ 915E6
+#define RF95_FREQ_LOW 905E6
+#define RF95_FREQ_MID 915E6
+#define RF95_FREQ_HIGH 925E6
 
 byte msgCount = 0;		  // count of outgoing messages
 byte localAddress = 0x42; // address of this device
 byte destination = 0x69;  // destination to send to
 long lastSendTime = 0;	  // last send time
-int interval = 2000;	  // interval between sends
+int interval = 1000;	  // interval between sends
+bool ackCommand = false;  // acknowledge reception of last command
+bool enableJetson = true;
 
 struct dataPacket
 {
@@ -128,7 +133,7 @@ struct commandPacket
 	int left_rpm_command;
 	int right_rpm_command;
 	bool change_frequency;
-	double lora_frequency;
+	char lora_frequency;
 	bool command_navigate;
 	float command_latitude;
 	float command_longitude;
@@ -329,13 +334,49 @@ void loop()
 		myPacket.left_wheels_rpm = frleftMotorSpd;
 		myPacket.right_wheels_rpm = frrightMotorSpd;
 		myPacket.autonomous_status = 0;
-		myPacket.command_ack = false;
+		myPacket.command_ack = ackCommand;
+		ackCommand = false;
 		myPacket.dist_to_goal = 0;
 		myPacket.mode = 0;
 
 		sendData(myPacket);
 		lastSendTime = millis();
 	}
+	
+	commandPacket packet;
+	if (onReceive(LoRa.parsePacket(), &packet))
+	{
+		ackCommand = true;
+		if (packet.change_frequency)
+		{
+			if (packet.lora_frequency == 'L')
+			{
+				LoRa.setFrequency(RF95_FREQ_LOW);
+			} else if (packet.lora_frequency == 'M')
+			{
+				LoRa.setFrequency(RF95_FREQ_MID);
+			} else if (packet.lora_frequency == 'H')
+			{
+				LoRa.setFrequency(RF95_FREQ_HIGH);
+			}
+		}
+
+		if (packet.halt)
+		{
+			frleftMotorSpd = 0;
+			frrightMotorSpd = 0;
+			bkleftMotorSpd = 0;
+			bkrightMotorSpd = 0;
+		}
+
+		if (packet.ignore_jetson)
+		{
+			enableJetson = false;
+		} else {
+			enableJetson = true;
+		}
+	}
+
 
 	if (millis() - lastPacketTime > 200)
 	{
@@ -354,7 +395,7 @@ void loop()
 void parseCommand(String command)
 {
 	String exec = command.substring(0, command.indexOf(';'));
-	if (exec.equals("set_motors"))
+	if (exec.equals("set_motors") && enableJetson)
 	{
 		lastPacketTime = millis();
 
@@ -370,7 +411,7 @@ void parseCommand(String command)
 
 		calculateTankControlSpeeds(magnitude, direction, speed);
 	}
-	else if (exec.equals("set_motor"))
+	else if (exec.equals("set_motor") && enableJetson)
 	{
 		lastPacketTime = millis();
 
@@ -616,7 +657,7 @@ void sendData(dataPacket packet)
 	LoRa.write(msgCount);							// add message ID
 	LoRa.write(sizeof(packet));						// add payload length
 	LoRa.write((uint8_t *)&packet, sizeof(packet)); // add payload
-	LoRa.endPacket();								// finish packet and send it
+	LoRa.endPacket(false);								// finish packet and send it
 	msgCount++;										// increment message ID
 }
 
@@ -638,17 +679,27 @@ boolean onReceive(int packetSize, commandPacket *recvd_packet)
 	// if the recipient isn't this device or broadcast,
 	if (recipient != localAddress && recipient != 0xFF)
 	{
-		Serial.println("This message is not for me.");
+		Serial.println("status;This message is not for me.");
 		return false; // skip rest of function
 	}
 
 	// if message is for this device, or broadcast, print details:
-	Serial.println("Received from: 0x" + String(sender, HEX));
-	Serial.println("Sent to: 0x" + String(recipient, HEX));
-	Serial.println("Message ID: " + String(incomingMsgId));
-	Serial.println("Message length: " + String(incomingLength));
-	Serial.println("RSSI: " + String(LoRa.packetRssi()));
-	Serial.println("Snr: " + String(LoRa.packetSnr()));
+	Serial.print("packet_info;");
+	Serial.print("sender=");
+	Serial.print(String(sender, HEX));
+	Serial.print(",receiver=");
+	Serial.print(String(recipient, HEX));
+	Serial.print(",msg_id=");
+	Serial.print(String(incomingMsgId));
+	Serial.print(",msg_len=");
+	Serial.print(String(incomingLength));
+	Serial.print(",rssi=");
+	Serial.print(String(LoRa.packetRssi()));
+	Serial.print(",snr=");
+	Serial.print(String(LoRa.packetSnr()));
+	Serial.print(",gs_time=");
+	Serial.print(millis());
 	Serial.println();
+
 	return true;
 }
