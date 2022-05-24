@@ -300,7 +300,12 @@ void loop()
 	if (GPS.newNMEAreceived())
 	{
 		GPS.parse(GPS.lastNMEA());
-		publishGPSData();
+
+		if(GPS.lastSentence[0] == 'G' && GPS.lastSentence[1] == 'G' && GPS.lastSentence[2] == 'A')
+		{
+			publishGPSData();
+		}
+		
 	}
 
 	if (millis() - lastBatteryTime > 1000)
