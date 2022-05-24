@@ -160,10 +160,10 @@ void setup()
 	// Serial Communications
 	JSerial.begin(115200);
 
-	while (!Serial && millis() < 15000)
-	{
-		delay(10);
-	}
+	// while (!Serial && millis() < 15000)
+	// {
+	// 	delay(10);
+	// }
 
 	// LoRA
 	// override the default CS, reset, and IRQ pins (optional)
