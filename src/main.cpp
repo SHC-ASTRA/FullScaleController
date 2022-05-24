@@ -87,6 +87,7 @@ void publishBatteryData();
 //*******************************
 // Command Handling
 //*******************************
+#define JSerial Serial4
 void parseCommand(String command);
 void setMotors(float magnitude, float direction);
 
@@ -145,7 +146,7 @@ boolean onReceive(int, commandPacket *);
 
 void s()
 {
-	Serial.print("status;");
+	JSerial.print("status;");
 }
 
 void setup()
@@ -157,7 +158,7 @@ void setup()
 	clear_strip(clear_color);
 
 	// Serial Communications
-	Serial.begin(115200);
+	JSerial.begin(115200);
 
 	while (!Serial && millis() < 15000)
 	{
@@ -170,9 +171,7 @@ void setup()
 
 	if (!LoRa.begin(RF95_FREQ))
 	{ // initialize ratio at 915 MHz
-		Serial.println("LoRa init failed. Check your connections.");
-		while (true)
-			; // if failed, do nothing
+		JSerial.println("LoRa init failed. Check your connections.");
 	}
 	LoRa.setTxPower(20);
 	LoRa.setSignalBandwidth(500E3);
@@ -180,7 +179,7 @@ void setup()
 	LoRa.setFrequency(915E6);
 	LoRa.enableCrc();
 
-	Serial.println("LoRa init succeeded.");
+	JSerial.println("LoRa init succeeded.");
 
 	// I2C - For GPS Module
 	Wire.begin();
@@ -203,82 +202,82 @@ void setup()
 	if (VESC1.getVescValues())
 	{
 		s();
-		Serial.println("VESC 1 Connected!");
+		JSerial.println("VESC 1 Connected!");
 		s();
-		Serial.println(VESC1.data.id);
+		JSerial.println(VESC1.data.id);
 		s();
-		Serial.println(VESC1.data.rpm);
+		JSerial.println(VESC1.data.rpm);
 		s();
-		Serial.println(VESC1.data.inpVoltage);
+		JSerial.println(VESC1.data.inpVoltage);
 		s();
-		Serial.println(VESC1.data.ampHours);
+		JSerial.println(VESC1.data.ampHours);
 		s();
-		Serial.println(VESC1.data.tachometerAbs);
+		JSerial.println(VESC1.data.tachometerAbs);
 	}
 	else
 	{
 		s();
-		Serial.println("No VESC1");
+		JSerial.println("No VESC1");
 	}
 	if (VESC2.getVescValues())
 	{
 		s();
-		Serial.println("VESC 2 Connected!");
+		JSerial.println("VESC 2 Connected!");
 		s();
-		Serial.println(VESC2.data.id);
+		JSerial.println(VESC2.data.id);
 		s();
-		Serial.println(VESC2.data.rpm);
+		JSerial.println(VESC2.data.rpm);
 		s();
-		Serial.println(VESC2.data.inpVoltage);
+		JSerial.println(VESC2.data.inpVoltage);
 		s();
-		Serial.println(VESC2.data.ampHours);
+		JSerial.println(VESC2.data.ampHours);
 		s();
-		Serial.println(VESC2.data.tachometerAbs);
+		JSerial.println(VESC2.data.tachometerAbs);
 	}
 	else
 	{
 		s();
-		Serial.println("No VESC2");
+		JSerial.println("No VESC2");
 	}
 	if (VESC4.getVescValues())
 	{
 		s();
-		Serial.println("VESC 4 Connected!");
+		JSerial.println("VESC 4 Connected!");
 		s();
-		Serial.println(VESC4.data.id);
+		JSerial.println(VESC4.data.id);
 		s();
-		Serial.println(VESC4.data.rpm);
+		JSerial.println(VESC4.data.rpm);
 		s();
-		Serial.println(VESC4.data.inpVoltage);
+		JSerial.println(VESC4.data.inpVoltage);
 		s();
-		Serial.println(VESC4.data.ampHours);
+		JSerial.println(VESC4.data.ampHours);
 		s();
-		Serial.println(VESC4.data.tachometerAbs);
+		JSerial.println(VESC4.data.tachometerAbs);
 	}
 	else
 	{
 		s();
-		Serial.println("No VESC4");
+		JSerial.println("No VESC4");
 	}
 	if (VESC5.getVescValues())
 	{
 		s();
-		Serial.println("VESC 5 Connected!");
+		JSerial.println("VESC 5 Connected!");
 		s();
-		Serial.println(VESC5.data.id);
+		JSerial.println(VESC5.data.id);
 		s();
-		Serial.println(VESC5.data.rpm);
+		JSerial.println(VESC5.data.rpm);
 		s();
-		Serial.println(VESC5.data.inpVoltage);
+		JSerial.println(VESC5.data.inpVoltage);
 		s();
-		Serial.println(VESC5.data.ampHours);
+		JSerial.println(VESC5.data.ampHours);
 		s();
-		Serial.println(VESC5.data.tachometerAbs);
+		JSerial.println(VESC5.data.tachometerAbs);
 	}
 	else
 	{
 		s();
-		Serial.println("No VESC5");
+		JSerial.println("No VESC5");
 	}
 
 	// Give VESC time to boot up
@@ -317,9 +316,9 @@ void loop()
 		publishBatteryData();
 	}
 
-	if (Serial.available())
+	if (JSerial.available())
 	{
-		String command = Serial.readStringUntil('\n');
+		String command = JSerial.readStringUntil('\n');
 		parseCommand(command);
 	}
 
@@ -537,14 +536,14 @@ void calculateMotorSpeeds(float magnitude, float direction, float speed)
 		bkrightMotorSpd = 0;
 	}
 
-	Serial.print("status;");
-	Serial.print(frleftMotorSpd);
-	Serial.print(" ");
-	Serial.print(frrightMotorSpd);
-	Serial.print(" ");
-	Serial.print(bkleftMotorSpd);
-	Serial.print(" ");
-	Serial.print(bkrightMotorSpd);
+	JSerial.print("status;");
+	JSerial.print(frleftMotorSpd);
+	JSerial.print(" ");
+	JSerial.print(frrightMotorSpd);
+	JSerial.print(" ");
+	JSerial.print(bkleftMotorSpd);
+	JSerial.print(" ");
+	JSerial.print(bkrightMotorSpd);
 }
 
 void clear_strip(uint32_t color)
@@ -564,13 +563,13 @@ void set_single_color(int pin, uint32_t color)
 
 void publishBatteryData()
 {
-	Serial.print("battery;");
+	JSerial.print("battery;");
 
-	Serial.print("v=");
-	Serial.print(batteryVoltage);
+	JSerial.print("v=");
+	JSerial.print(batteryVoltage);
 
-	Serial.print(",c=");
-	Serial.println(batteryCharge);
+	JSerial.print(",c=");
+	JSerial.println(batteryCharge);
 }
 
 void setupAdafruitGPS()
@@ -594,47 +593,47 @@ void setupAdafruitGPS()
 
 void publishGPSData()
 {
-	Serial.print("gps;");
+	JSerial.print("gps;");
 
-	Serial.print("time=");
+	JSerial.print("time=");
 	uint8_t hms = GPS.hour; // Print the hours
-	Serial.print(hms);
+	JSerial.print(hms);
 
-	Serial.print(F(":"));
+	JSerial.print(F(":"));
 	hms = GPS.minute; // Print the minutes
-	Serial.print(hms);
+	JSerial.print(hms);
 
-	Serial.print(F(":"));
+	JSerial.print(F(":"));
 	hms = GPS.seconds; // Print the seconds
-	Serial.print(hms);
+	JSerial.print(hms);
 
-	Serial.print(F("."));
+	JSerial.print(F("."));
 	unsigned long millisecs = GPS.milliseconds; // Print the milliseconds
-	Serial.print(millisecs);
+	JSerial.print(millisecs);
 
-	Serial.print(",lat=");
+	JSerial.print(",lat=");
 	long latitude = GPS.latitude_fixed; // Print the latitude
-	Serial.print(latitude);
+	JSerial.print(latitude);
 
-	Serial.print(",long=");
+	JSerial.print(",long=");
 	long longitude = GPS.longitude_fixed; // Print the longitude
-	Serial.print(longitude);
+	JSerial.print(longitude);
 
 	long altitude = GPS.altitude; // Print the height above mean sea level
-	Serial.print(",alt=");
-	Serial.print(altitude);
+	JSerial.print(",alt=");
+	JSerial.print(altitude);
 
 	long ground_speed = GPS.speed;
-	Serial.print(",ground_speed=");
-	Serial.print(ground_speed);
+	JSerial.print(",ground_speed=");
+	JSerial.print(ground_speed);
 
 	long motion_heading = GPS.angle;
-	Serial.print(",motion_heading=");
-	Serial.print(motion_heading);
+	JSerial.print(",motion_heading=");
+	JSerial.print(motion_heading);
 
 	long horizontal_accuracy = 3;
-	Serial.print(",horizontal_accuracy=");
-	Serial.println(horizontal_accuracy);
+	JSerial.print(",horizontal_accuracy=");
+	JSerial.println(horizontal_accuracy);
 }
 
 void sendMessage(String outgoing)
@@ -679,27 +678,27 @@ boolean onReceive(int packetSize, commandPacket *recvd_packet)
 	// if the recipient isn't this device or broadcast,
 	if (recipient != localAddress && recipient != 0xFF)
 	{
-		Serial.println("status;This message is not for me.");
+		JSerial.println("status;This message is not for me.");
 		return false; // skip rest of function
 	}
 
 	// if message is for this device, or broadcast, print details:
-	Serial.print("packet_info;");
-	Serial.print("sender=");
-	Serial.print(String(sender, HEX));
-	Serial.print(",receiver=");
-	Serial.print(String(recipient, HEX));
-	Serial.print(",msg_id=");
-	Serial.print(String(incomingMsgId));
-	Serial.print(",msg_len=");
-	Serial.print(String(incomingLength));
-	Serial.print(",rssi=");
-	Serial.print(String(LoRa.packetRssi()));
-	Serial.print(",snr=");
-	Serial.print(String(LoRa.packetSnr()));
-	Serial.print(",gs_time=");
-	Serial.print(millis());
-	Serial.println();
+	JSerial.print("packet_info;");
+	JSerial.print("sender=");
+	JSerial.print(String(sender, HEX));
+	JSerial.print(",receiver=");
+	JSerial.print(String(recipient, HEX));
+	JSerial.print(",msg_id=");
+	JSerial.print(String(incomingMsgId));
+	JSerial.print(",msg_len=");
+	JSerial.print(String(incomingLength));
+	JSerial.print(",rssi=");
+	JSerial.print(String(LoRa.packetRssi()));
+	JSerial.print(",snr=");
+	JSerial.print(String(LoRa.packetSnr()));
+	JSerial.print(",gs_time=");
+	JSerial.print(millis());
+	JSerial.println();
 
 	return true;
 }
