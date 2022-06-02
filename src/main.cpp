@@ -144,6 +144,8 @@ void sendMessage(String);
 void sendData(dataPacket);
 boolean onReceive(int, commandPacket *);
 
+boolean doLora = true;
+
 void s()
 {
 	JSerial.print("status;");
@@ -172,12 +174,17 @@ void setup()
 	if (!LoRa.begin(RF95_FREQ))
 	{ // initialize ratio at 915 MHz
 		JSerial.println("LoRa init failed. Check your connections.");
+		doLora = false;
 	}
-	LoRa.setTxPower(20);
-	LoRa.setSignalBandwidth(500E3);
-	LoRa.setSpreadingFactor(10);
-	LoRa.setFrequency(915E6);
-	LoRa.enableCrc();
+
+	if (doLora)
+	{
+		LoRa.setTxPower(20);
+		LoRa.setSignalBandwidth(500E3);
+		LoRa.setSpreadingFactor(10);
+		LoRa.setFrequency(915E6);
+		LoRa.enableCrc();
+	}
 
 	JSerial.println("LoRa init succeeded.");
 
@@ -301,11 +308,10 @@ void loop()
 	{
 		GPS.parse(GPS.lastNMEA());
 
-		if(GPS.lastSentence[0] == 'G' && GPS.lastSentence[1] == 'G' && GPS.lastSentence[2] == 'A')
+		if (GPS.lastSentence[0] == 'G' && GPS.lastSentence[1] == 'G' && GPS.lastSentence[2] == 'A')
 		{
 			publishGPSData();
 		}
-		
 	}
 
 	if (millis() - lastBatteryTime > 1000)
@@ -346,41 +352,47 @@ void loop()
 		sendData(myPacket);
 		lastSendTime = millis();
 	}
-	
-	commandPacket packet;
-	if (onReceive(LoRa.parsePacket(), &packet))
+
+	if (doLora)
 	{
-		ackCommand = true;
-		if (packet.change_frequency)
+		commandPacket packet;
+		if (onReceive(LoRa.parsePacket(), &packet))
 		{
-			if (packet.lora_frequency == 'L')
+			ackCommand = true;
+			if (packet.change_frequency)
 			{
-				LoRa.setFrequency(RF95_FREQ_LOW);
-			} else if (packet.lora_frequency == 'M')
+				if (packet.lora_frequency == 'L')
+				{
+					LoRa.setFrequency(RF95_FREQ_LOW);
+				}
+				else if (packet.lora_frequency == 'M')
+				{
+					LoRa.setFrequency(RF95_FREQ_MID);
+				}
+				else if (packet.lora_frequency == 'H')
+				{
+					LoRa.setFrequency(RF95_FREQ_HIGH);
+				}
+			}
+
+			if (packet.halt)
 			{
-				LoRa.setFrequency(RF95_FREQ_MID);
-			} else if (packet.lora_frequency == 'H')
+				frleftMotorSpd = 0;
+				frrightMotorSpd = 0;
+				bkleftMotorSpd = 0;
+				bkrightMotorSpd = 0;
+			}
+
+			if (packet.ignore_jetson)
 			{
-				LoRa.setFrequency(RF95_FREQ_HIGH);
+				enableJetson = false;
+			}
+			else
+			{
+				enableJetson = true;
 			}
 		}
-
-		if (packet.halt)
-		{
-			frleftMotorSpd = 0;
-			frrightMotorSpd = 0;
-			bkleftMotorSpd = 0;
-			bkrightMotorSpd = 0;
-		}
-
-		if (packet.ignore_jetson)
-		{
-			enableJetson = false;
-		} else {
-			enableJetson = true;
-		}
 	}
-
 
 	if (millis() - lastPacketTime > 200)
 	{
@@ -442,6 +454,17 @@ void parseCommand(String command)
 		}
 		else if (motor.equals("back_left"))
 		{
+			bkLeftPower = power;
+		}
+
+		else if (motor.equals("right"))
+		{
+			frRightPower = power;
+			bkRightPower = power;
+		}
+		else if (motor.equals("left"))
+		{
+			frLeftPower = power;
 			bkLeftPower = power;
 		}
 
@@ -643,67 +666,80 @@ void publishGPSData()
 
 void sendMessage(String outgoing)
 {
-	LoRa.beginPacket();			   // start packet
-	LoRa.write(destination);	   // add destination address
-	LoRa.write(localAddress);	   // add sender address
-	LoRa.write(msgCount);		   // add message ID
-	LoRa.write(outgoing.length()); // add payload length
-	LoRa.print(outgoing);		   // add payload
-	LoRa.endPacket();			   // finish packet and send it
-	msgCount++;					   // increment message ID
+	if (doLora)
+	{
+		LoRa.beginPacket();			   // start packet
+		LoRa.write(destination);	   // add destination address
+		LoRa.write(localAddress);	   // add sender address
+		LoRa.write(msgCount);		   // add message ID
+		LoRa.write(outgoing.length()); // add payload length
+		LoRa.print(outgoing);		   // add payload
+		LoRa.endPacket();			   // finish packet and send it
+		msgCount++;					   // increment message ID
+	}
 }
 
 void sendData(dataPacket packet)
 {
-	LoRa.beginPacket();								// start packet
-	LoRa.write(destination);						// add destination address
-	LoRa.write(localAddress);						// add sender address
-	LoRa.write(msgCount);							// add message ID
-	LoRa.write(sizeof(packet));						// add payload length
-	LoRa.write((uint8_t *)&packet, sizeof(packet)); // add payload
-	LoRa.endPacket(false);								// finish packet and send it
-	msgCount++;										// increment message ID
+	if (doLora)
+	{
+		LoRa.beginPacket();								// start packet
+		LoRa.write(destination);						// add destination address
+		LoRa.write(localAddress);						// add sender address
+		LoRa.write(msgCount);							// add message ID
+		LoRa.write(sizeof(packet));						// add payload length
+		LoRa.write((uint8_t *)&packet, sizeof(packet)); // add payload
+		LoRa.endPacket(false);							// finish packet and send it
+		msgCount++;
+	} // increment message ID
 }
 
 boolean onReceive(int packetSize, commandPacket *recvd_packet)
 {
-	if (packetSize == 0)
-		return false; // if there's no packet, return
-
-	// read packet header bytes:
-	int recipient = LoRa.read();	   // recipient address
-	byte sender = LoRa.read();		   // sender address
-	byte incomingMsgId = LoRa.read();  // incoming msg ID
-	byte incomingLength = LoRa.read(); // incoming msg length
-
-	uint8_t buffer[sizeof(commandPacket)];
-	LoRa.readBytes(buffer, sizeof(commandPacket));
-	memcpy(recvd_packet, buffer, sizeof(commandPacket));
-
-	// if the recipient isn't this device or broadcast,
-	if (recipient != localAddress && recipient != 0xFF)
+	if (doLora)
 	{
-		JSerial.println("status;This message is not for me.");
-		return false; // skip rest of function
+		if (packetSize == 0)
+			return false; // if there's no packet, return
+
+		// read packet header bytes:
+		int recipient = LoRa.read();	   // recipient address
+		byte sender = LoRa.read();		   // sender address
+		byte incomingMsgId = LoRa.read();  // incoming msg ID
+		byte incomingLength = LoRa.read(); // incoming msg length
+
+		uint8_t buffer[sizeof(commandPacket)];
+		LoRa.readBytes(buffer, sizeof(commandPacket));
+		memcpy(recvd_packet, buffer, sizeof(commandPacket));
+
+		// if the recipient isn't this device or broadcast,
+		if (recipient != localAddress && recipient != 0xFF)
+		{
+			JSerial.println("status;This message is not for me.");
+			return false; // skip rest of function
+		}
+
+		// if message is for this device, or broadcast, print details:
+		JSerial.print("packet_info;");
+		JSerial.print("sender=");
+		JSerial.print(String(sender, HEX));
+		JSerial.print(",receiver=");
+		JSerial.print(String(recipient, HEX));
+		JSerial.print(",msg_id=");
+		JSerial.print(String(incomingMsgId));
+		JSerial.print(",msg_len=");
+		JSerial.print(String(incomingLength));
+		JSerial.print(",rssi=");
+		JSerial.print(String(LoRa.packetRssi()));
+		JSerial.print(",snr=");
+		JSerial.print(String(LoRa.packetSnr()));
+		JSerial.print(",gs_time=");
+		JSerial.print(millis());
+		JSerial.println();
+
+		return true;
 	}
-
-	// if message is for this device, or broadcast, print details:
-	JSerial.print("packet_info;");
-	JSerial.print("sender=");
-	JSerial.print(String(sender, HEX));
-	JSerial.print(",receiver=");
-	JSerial.print(String(recipient, HEX));
-	JSerial.print(",msg_id=");
-	JSerial.print(String(incomingMsgId));
-	JSerial.print(",msg_len=");
-	JSerial.print(String(incomingLength));
-	JSerial.print(",rssi=");
-	JSerial.print(String(LoRa.packetRssi()));
-	JSerial.print(",snr=");
-	JSerial.print(String(LoRa.packetSnr()));
-	JSerial.print(",gs_time=");
-	JSerial.print(millis());
-	JSerial.println();
-
-	return true;
+	else
+	{
+		return false;
+	}
 }
