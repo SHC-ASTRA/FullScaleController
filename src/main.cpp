@@ -88,6 +88,7 @@ void publishBatteryData();
 // Command Handling
 //*******************************
 #define JSerial Serial4
+// #define JSerial Serial
 void parseCommand(String command);
 void setMotors(float magnitude, float direction);
 
@@ -402,10 +403,15 @@ void loop()
 		bkrightMotorSpd = 0;
 	}
 
-	VESC1.setRPM(frrightMotorSpd);
-	VESC2.setRPM(frleftMotorSpd);
-	VESC4.setRPM(bkleftMotorSpd);
-	VESC5.setRPM(bkrightMotorSpd);
+	// VESC1.setRPM(frrightMotorSpd);
+	// VESC2.setRPM(frleftMotorSpd);
+	// VESC4.setRPM(bkleftMotorSpd);
+	// VESC5.setRPM(bkrightMotorSpd);
+
+	VESC1.setDuty((float)frrightMotorSpd / (float)MAX_SPEED);
+	VESC2.setDuty((float)frleftMotorSpd / (float)MAX_SPEED);
+	VESC4.setDuty((float)bkleftMotorSpd / (float)MAX_SPEED);
+	VESC5.setDuty((float)bkrightMotorSpd / (float)MAX_SPEED);
 }
 
 void parseCommand(String command)
