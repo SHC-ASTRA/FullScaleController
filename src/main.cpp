@@ -9,6 +9,7 @@
 #include <ADC_util.h>
 #include <VescUart.h>
 #include <Adafruit_GPS.h>
+#include <SoftwareSerial.h>
 
 //*******************************
 // RGB Strip Configuration
@@ -38,7 +39,8 @@ bool isGoal = false;
 // GPS Module Configuration
 //*******************************
 #define GPSSerial Serial6
-#define GPSSerial2 Serial
+SoftwareSerial mySerial =  SoftwareSerial(10, 11);
+#define GPSSerial2 mySerial
 Adafruit_GPS GPS(&GPSSerial);
 Adafruit_GPS GPS2(&GPSSerial2);
 void setupAdafruitGPS();
