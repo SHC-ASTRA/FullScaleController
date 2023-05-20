@@ -4,7 +4,6 @@
 #include <SparkFun_u-blox_GNSS_Arduino_Library.h>
 #include <MicroNMEA.h>
 #include <SPI.h>
-#include <LoRa.h>
 #include <Adafruit_NeoPixel.h>
 #include <ADC.h>
 #include <ADC_util.h>
@@ -18,8 +17,6 @@
 #define LED_COUNT 64
 #define SERIAL_TX_LED 0
 #define SERIAL_RX_LED 1
-#define LORA_TX_LED 2
-#define LORA_RX_LED 3
 #define BORDER_START_LED 4
 #define BORDER_END_LED 63
 
@@ -41,6 +38,7 @@ bool isGoal = false;
 // GPS Module Configuration
 //*******************************
 #define GPSSerial Serial6
+#define GPSSerial2 Serial
 Adafruit_GPS GPS(&GPSSerial);
 void setupAdafruitGPS();
 void publishGPSData();
@@ -92,18 +90,6 @@ void publishBatteryData();
 void parseCommand(String command);
 void setMotors(float magnitude, float direction);
 
-//*******************************
-// LoRA Configuration
-//*******************************
-#define RFM95_CS 10
-#define RFM95_RST 3
-#define RFM95_INT 4
-
-#define RF95_FREQ 915E6
-#define RF95_FREQ_LOW 905E6
-#define RF95_FREQ_MID 915E6
-#define RF95_FREQ_HIGH 925E6
-
 byte msgCount = 0;		  // count of outgoing messages
 byte localAddress = 0x42; // address of this device
 byte destination = 0x69;  // destination to send to
@@ -141,12 +127,6 @@ struct commandPacket
 	float command_longitude;
 };
 
-void sendMessage(String);
-void sendData(dataPacket);
-boolean onReceive(int, commandPacket *);
-
-boolean doLora = true;
-
 void s()
 {
 	JSerial.print("status;");
@@ -162,32 +142,6 @@ void setup()
 
 	// Serial Communications
 	JSerial.begin(115200);
-
-	// while (!Serial && millis() < 15000)
-	// {
-	// 	delay(10);
-	// }
-
-	// LoRA
-	// override the default CS, reset, and IRQ pins (optional)
-	LoRa.setPins(RFM95_CS, RFM95_RST, RFM95_INT); // set CS, reset, IRQ pin
-
-	if (!LoRa.begin(RF95_FREQ))
-	{ // initialize ratio at 915 MHz
-		JSerial.println("LoRa init failed. Check your connections.");
-		doLora = false;
-	}
-
-	if (doLora)
-	{
-		LoRa.setTxPower(20);
-		LoRa.setSignalBandwidth(500E3);
-		LoRa.setSpreadingFactor(10);
-		LoRa.setFrequency(915E6);
-		LoRa.enableCrc();
-	}
-
-	JSerial.println("LoRa init succeeded.");
 
 	// I2C - For GPS Module
 	Wire.begin();
@@ -350,49 +304,7 @@ void loop()
 		myPacket.dist_to_goal = 0;
 		myPacket.mode = 0;
 
-		sendData(myPacket);
 		lastSendTime = millis();
-	}
-
-	if (doLora)
-	{
-		commandPacket packet;
-		if (onReceive(LoRa.parsePacket(), &packet))
-		{
-			ackCommand = true;
-			if (packet.change_frequency)
-			{
-				if (packet.lora_frequency == 'L')
-				{
-					LoRa.setFrequency(RF95_FREQ_LOW);
-				}
-				else if (packet.lora_frequency == 'M')
-				{
-					LoRa.setFrequency(RF95_FREQ_MID);
-				}
-				else if (packet.lora_frequency == 'H')
-				{
-					LoRa.setFrequency(RF95_FREQ_HIGH);
-				}
-			}
-
-			if (packet.halt)
-			{
-				frleftMotorSpd = 0;
-				frrightMotorSpd = 0;
-				bkleftMotorSpd = 0;
-				bkrightMotorSpd = 0;
-			}
-
-			if (packet.ignore_jetson)
-			{
-				enableJetson = false;
-			}
-			else
-			{
-				enableJetson = true;
-			}
-		}
 	}
 
 	if (millis() - lastPacketTime > 200)
@@ -668,84 +580,4 @@ void publishGPSData()
 	long horizontal_accuracy = 3;
 	JSerial.print(",horizontal_accuracy=");
 	JSerial.println(horizontal_accuracy);
-}
-
-void sendMessage(String outgoing)
-{
-	if (doLora)
-	{
-		LoRa.beginPacket();			   // start packet
-		LoRa.write(destination);	   // add destination address
-		LoRa.write(localAddress);	   // add sender address
-		LoRa.write(msgCount);		   // add message ID
-		LoRa.write(outgoing.length()); // add payload length
-		LoRa.print(outgoing);		   // add payload
-		LoRa.endPacket();			   // finish packet and send it
-		msgCount++;					   // increment message ID
-	}
-}
-
-void sendData(dataPacket packet)
-{
-	if (doLora)
-	{
-		LoRa.beginPacket();								// start packet
-		LoRa.write(destination);						// add destination address
-		LoRa.write(localAddress);						// add sender address
-		LoRa.write(msgCount);							// add message ID
-		LoRa.write(sizeof(packet));						// add payload length
-		LoRa.write((uint8_t *)&packet, sizeof(packet)); // add payload
-		LoRa.endPacket(false);							// finish packet and send it
-		msgCount++;
-	} // increment message ID
-}
-
-boolean onReceive(int packetSize, commandPacket *recvd_packet)
-{
-	if (doLora)
-	{
-		if (packetSize == 0)
-			return false; // if there's no packet, return
-
-		// read packet header bytes:
-		int recipient = LoRa.read();	   // recipient address
-		byte sender = LoRa.read();		   // sender address
-		byte incomingMsgId = LoRa.read();  // incoming msg ID
-		byte incomingLength = LoRa.read(); // incoming msg length
-
-		uint8_t buffer[sizeof(commandPacket)];
-		LoRa.readBytes(buffer, sizeof(commandPacket));
-		memcpy(recvd_packet, buffer, sizeof(commandPacket));
-
-		// if the recipient isn't this device or broadcast,
-		if (recipient != localAddress && recipient != 0xFF)
-		{
-			JSerial.println("status;This message is not for me.");
-			return false; // skip rest of function
-		}
-
-		// if message is for this device, or broadcast, print details:
-		JSerial.print("packet_info;");
-		JSerial.print("sender=");
-		JSerial.print(String(sender, HEX));
-		JSerial.print(",receiver=");
-		JSerial.print(String(recipient, HEX));
-		JSerial.print(",msg_id=");
-		JSerial.print(String(incomingMsgId));
-		JSerial.print(",msg_len=");
-		JSerial.print(String(incomingLength));
-		JSerial.print(",rssi=");
-		JSerial.print(String(LoRa.packetRssi()));
-		JSerial.print(",snr=");
-		JSerial.print(String(LoRa.packetSnr()));
-		JSerial.print(",gs_time=");
-		JSerial.print(millis());
-		JSerial.println();
-
-		return true;
-	}
-	else
-	{
-		return false;
-	}
 }
