@@ -40,6 +40,7 @@ bool isGoal = false;
 #define GPSSerial Serial6
 #define GPSSerial2 Serial
 Adafruit_GPS GPS(&GPSSerial);
+Adafruit_GPS GPS2(&GPSSerial2);
 void setupAdafruitGPS();
 void publishGPSData();
 
@@ -258,12 +259,25 @@ void setup()
 void loop()
 {
 	GPS.read();
+	GPS2.read();
 	// Process GPS
 	if (GPS.newNMEAreceived())
 	{
 		GPS.parse(GPS.lastNMEA());
 
 		if (GPS.lastSentence[0] == 'G' && GPS.lastSentence[1] == 'G' && GPS.lastSentence[2] == 'A')
+		{
+			// publishGPSData();
+		}
+	}
+	// Process GPS
+	if (GPS2.newNMEAreceived())
+	{
+		GPS2.parse(GPS2.lastNMEA());
+		GPS.parse(GPS.lastNMEA());
+		GPS.parse(GPS2.lastNMEA());
+
+		if (GPS2.lastSentence[0] == 'G' && GPS2.lastSentence[1] == 'G' && GPS2.lastSentence[2] == 'A')
 		{
 			publishGPSData();
 		}
@@ -529,12 +543,27 @@ void setupAdafruitGPS()
 	// For parsing data, we don't suggest using anything but either RMC only or RMC+GGA since
 	// the parser doesn't care about other sentences at this time
 	// Set the update rate
-	GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ); // 1 Hz update rate
+	GPS.sendCommand(PMTK_SET_NMEA_UPDATE_10HZ); // 1 Hz update rate
 	// For the parsing code to work nicely and have time to sort thru the data, and
 	// print it out we don't suggest using anything higher than 1 Hz
 
 	// Request updates on antenna status, comment out to keep quiet
 	GPS.sendCommand(PGCMD_ANTENNA);
+	// 9600 NMEA is the default baud rate for Adafruit MTK GPS's- some use 4800
+	GPS2.begin(9600);
+	// uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
+	GPS2.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+	// uncomment this line to turn on only the "minimum recommended" data
+	// GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCONLY);
+	// For parsing data, we don't suggest using anything but either RMC only or RMC+GGA since
+	// the parser doesn't care about other sentences at this time
+	// Set the update rate
+	GPS2.sendCommand(PMTK_SET_NMEA_UPDATE_10HZ); // 1 Hz update rate
+	// For the parsing code to work nicely and have time to sort thru the data, and
+	// print it out we don't suggest using anything higher than 1 Hz
+
+	// Request updates on antenna status, comment out to keep quiet
+	GPS2.sendCommand(PGCMD_ANTENNA);
 }
 
 void publishGPSData()
